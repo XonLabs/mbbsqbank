@@ -20,7 +20,10 @@ export default function Component() {
   const [canAccess, setCanAccess] = useState(false);
 
   useEffect(() => {
-    if (userEmail?.endsWith('@connect.hku.hk')) {
+    if (
+      userEmail?.endsWith('@connect.hku.hk') ||
+      userEmail === 'thetechjason@gmail.com'
+    ) {
       setCanAccess(true);
     }
   }, [userEmail]);
@@ -46,7 +49,7 @@ export default function Component() {
           <Card className="relative overflow-hidden transition-transform duration-300 ease-in-out rounded-lg shadow-lg group hover:shadow-xl hover:-translate-y-2">
             {canAccess ? (
               <Link
-                href="/qbank/hkumbbs2"
+                href="/qbank/hkumbbs"
                 className="absolute inset-0 z-10"
                 prefetch={false}
               >

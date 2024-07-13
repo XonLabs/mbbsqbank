@@ -22,6 +22,15 @@ import { useEffect, useState } from 'react';
 import ReviewScreen from './ReviewScreen';
 import useUserId from '~/core/hooks/use-user-id';
 import Alert from '~/core/ui/Alert';
+import { Avatar, AvatarFallback } from '~/core/ui/Avatar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/core/ui/ShadCNTooltip';
+import Link from 'next/link';
+import { ScrollArea } from '~/core/ui/scroll-area';
 
 type TopicTableProps = {
   topic_list: TopicList[];
@@ -87,6 +96,23 @@ const parseTopics = (topics: TopicList[]): NestedTopic => {
   return root;
 };
 
+// Custom hook for media query
+const useMediaQuery = (query: string) => {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    if (media.matches !== matches) {
+      setMatches(media.matches);
+    }
+    const listener = () => setMatches(media.matches);
+    window.addEventListener('resize', listener);
+    return () => window.removeEventListener('resize', listener);
+  }, [matches, query]);
+
+  return matches;
+};
+
 function TopicTable({
   topic_list,
   topic_stats,
@@ -104,6 +130,8 @@ function TopicTable({
   });
   const [questions, setQuestions] = useState<any[]>([]);
   const userId = useUserId();
+
+  const isMobile = useMediaQuery('(max-width: 640px)');
 
   console.log('stats', topic_stats);
   console.log('counts', topic_counts);
@@ -141,8 +169,9 @@ function TopicTable({
 
   const nestedTopics = parseTopics(topic_list);
 
-  console.log('nestedTopics', nestedTopics);
-
+  const handleDeselectAll = () => {
+    setSelectedTopics([]);
+  };
   // useEffect(() => {
   //   async function loadTopicStats() {
   //     if (userId) {
@@ -168,77 +197,49 @@ function TopicTable({
           <header className="flex items-center justify-between pb-4 border-b">
             <div className="flex items-center space-x-2">
               <GraduationCapIcon className="h-6 w-6" />
-              <h1 className="text-xl font-bold">MBBS II Question Bank</h1>
+              <h1 className="font-bold">MBBS Question Bank GodDisc</h1>
             </div>
-            <TopicModel
-              selectedTopics={selectedTopics}
-              onStartExercise={handleStartExercise}
-            />
-            {/* <nav className="flex space-x-4">
-              <Button variant="ghost">PRE-CLINICAL</Button>
-              <Button variant="ghost">INTRO TO CLINICAL</Button>
-            </nav> */}
+            <div className="flex items-center space-x-4">
+              <span className="text-sm font-medium">
+                {selectedTopics.length} topic
+                {selectedTopics.length !== 1 ? 's' : ''} selected
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeselectAll}
+                disabled={selectedTopics.length === 0}
+              >
+                Deselect All
+              </Button>
+              <TopicModel
+                selectedTopics={selectedTopics}
+                onStartExercise={handleStartExercise}
+              />
+            </div>
           </header>
-          <section className="my-6">
+          <div className="flex flex-row space-x-2 mt-3">
+            <Link href="https://insigh.to/b/mbbs-qbank">
+              <Button variant="ghost">Leave Feedback</Button>
+            </Link>
+          </div>
+          <section className="my-3">
             <div className="flex items-center justify-between">
               <Alert type={'info'} className="w-full">
-                <Alert.Heading>
-                  Welcome to HKUMed Question Bank (QBank)!
-                </Alert.Heading>
-                <p className="mb-3">
-                  This is an unofficial platform that is completely free and
-                  open source. The goal is to enhance our exam preparation by
-                  stream-lining the exam grinding process. The mission is to:
-                </p>
-                <ul className="list-disc pl-5 space-y-2 mb-3">
-                  <li>
-                    Comprehensive digitalization of all old spec + new spec
-                    questions in one unified platform
-                  </li>
-                  <li>
-                    Customizable sorting options not possible on paper: Practice
-                    by topic, by year, by question type, by previously correct
-                    or incorrect answers
-                  </li>
-                  <li>
-                    Automatic grading for MCQ + SAQ questions based on
-                    peer-reviewed and faculty official mark schemes with tracked
-                    correct/incorrect answers and past performance to help
-                    identify weaknesses
-                  </li>
-                  <li>
-                    Question-specific discussion threads to facilitate peer
-                    review of mark scheme validity
-                  </li>
-                  <li>
-                    Dedicated admin panel for student-driven updates, ensuring
-                    the platform stays current and relevant
-                  </li>
-                </ul>
-                <p className="text-sm italic">
-                  Note: This platform is for HKU medical students only. Please
-                  use responsibly and ethically for personal study.{' '}
-                  <a
-                    href="/disclaimer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    Learn more about the disclaimer and platform here
-                  </a>
-                  .
-                </p>
+                {isMobile ? (
+                  <ScrollArea className="h-[300px]">
+                    <AlertContent />
+                  </ScrollArea>
+                ) : (
+                  <AlertContent />
+                )}
               </Alert>
-              <div className="flex space-x-2">
-                {/* <Button variant="outline">
-                  <BarChartIcon className="mr-2 h-4 w-4" />
-                  OVERVIEW
-                </Button>
-                <Button variant="outline">
-                  <TableIcon className="mr-2 h-4 w-4" />
-                  DETAILS VIEW
-                </Button> */}
-              </div>
             </div>
           </section>
+          <span className="text-xs text-gray-500">
+            Note: To update the numbers in the table - you might need to refresh
+            the page to fetch the latest data.
+          </span>
           <Table>
             <TableHeader>
               <TableRow>
@@ -422,6 +423,142 @@ const NestedTopicRow = ({
             topic_counts={topic_counts}
           />
         ))}
+    </>
+  );
+};
+
+const AlertContent = () => {
+  return (
+    <>
+      <Alert.Heading>Welcome to HKUMed Question Bank (QBank)!</Alert.Heading>
+      <p className="mb-3">
+        This is an unofficial platform that is completely free and open source.
+        The goal is to enhance our exam preparation by stream-lining the exam
+        grinding process. The mission is to:
+      </p>
+      <ul className="list-disc pl-5 space-y-2 mb-3">
+        <li>
+          Comprehensive digitalization of all old spec + new spec questions in
+          one unified platform (currently it its just new spec questions -
+          please upvote in the feedback board if you think old spec would be
+          useful too - any contributors welcome!
+        </li>
+        <li>
+          Customizable sorting options only possible here: Practice by topic, by
+          year, by question type, by previously correct or incorrect answers
+        </li>
+        <li>
+          Automatic grading for MCQ + SAQ questions based on peer-reviewed and
+          faculty official mark schemes with tracked correct/incorrect answers
+          and past performance to help identify weaknesses
+        </li>
+        <li>
+          Question-specific discussion threads to facilitate peer review of mark
+          scheme validity
+        </li>
+        <li>
+          Dedicated admin panel for student-driven updates, ensuring the
+          platform stays current and relevant.{' '}
+          <a
+            href="https://insigh.to/b/mbbs-qbank"
+            target="_blank"
+            className="text-blue-600 hover:underline"
+          >
+            Leave your feedback at our public board here.
+          </a>
+        </li>
+      </ul>
+      <p className="text-sm italic">
+        Note: This platform is for HKU medical students only. Please use
+        responsibly and ethically for personal study.{' '}
+        <a
+          href="https://thetechjason.notion.site/MBBS-Question-Bank-QBank-Platform-Access-and-Guide-0bb0d896d68848dc83eac027c96c8250?pvs=4"
+          className="text-blue-600 hover:underline"
+          target="_blank"
+        >
+          Learn more about the disclaimer and platform here
+        </a>
+        . This platform is not affiliated with, endorsed by, or officially
+        connected to the Li Ka Shing Faculty of Medicine or The University of
+        Hong Kong. It is an independent, student-led initiative.
+      </p>
+      <h3>Contributors</h3>
+      <p>
+        This platform is a collaborative effort by the following contributors:
+      </p>
+
+      <div className="flex flex-row space-x-2 pt-2">
+        <div className="flex items-center space-x-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Avatar className="w-2 h-2 ">
+                  <AvatarFallback className="text-xs">JC</AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent className="w-[200px]">
+                <div className="flex flex-col">
+                  <p>Jason Chan (M28)</p>
+                  <p>
+                    Built out the whole question bank system, MCQ auto-grading,
+                    and SAQ auto-grading.
+                  </p>
+                  <p>
+                    Formatted GIS, MSS, HNNS, HIS, ERS MCQs and EMQs (with
+                    pictures) into database suitable for this question bank.
+                  </p>
+                  <p>
+                    Formatted HNNS, HIS, ERS SAQs (with pictures) into database
+                    suitable for this question bank.
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Avatar className="w-2 h-2 ">
+                  <AvatarFallback className="text-xs">Kim</AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent className="w-[200px]">
+                <div className="flex flex-col">
+                  <p>Kim (M28)</p>
+                  <p>
+                    Categorization of all GIS, MSS, HNNS, HIS, ERS MCQs and EMQs
+                    and SAQs as well as answers (New Spec) 🙏 ( i.e. the goat)
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Avatar className="w-2 h-2 ">
+                  <AvatarFallback className="text-xs">CC</AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent className="w-[200px]">
+                <div className="flex flex-col">
+                  <p>Calvin Cheung (M27)</p>
+                  <p>
+                    Formatted GIS, MSS SAQs into database suitable for this
+                    question bank.
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
     </>
   );
 };

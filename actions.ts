@@ -97,6 +97,7 @@ export async function fetchQuestions({
   mcq,
   emq,
   saq,
+  shuffle,
 }: {
   selectedTopics: string[];
   core: boolean;
@@ -110,10 +111,23 @@ export async function fetchQuestions({
   mcq: boolean;
   emq: boolean;
   saq: boolean;
+  shuffle: boolean;
 }) {
   const client = getSupabaseServerActionClient();
 
-  let query = client
+  // Filter by difficulty
+  const difficulties = [];
+  if (core) difficulties.push(1);
+  if (medium) difficulties.push(2);
+  if (hard) difficulties.push(3);
+
+  // Filter by question type
+  const questionTypes = [];
+  if (mcq) questionTypes.push('mcq');
+  if (emq) questionTypes.push('emq');
+  if (saq) questionTypes.push('saq');
+
+  const { data: allQuestions, error } = await client
     .from('questions')
     .select(
       `
@@ -125,29 +139,9 @@ export async function fetchQuestions({
     .order('created_at', {
       referencedTable: 'student_responses',
       ascending: false,
-    });
-
-  // Filter by difficulty
-  const difficulties = [];
-  if (core) difficulties.push(1);
-  if (medium) difficulties.push(2);
-  if (hard) difficulties.push(3);
-
-  if (difficulties.length > 0) {
-    query = query.in('difficulty', difficulties);
-  }
-
-  // Filter by question type
-  const questionTypes = [];
-  if (mcq) questionTypes.push('mcq');
-  if (emq) questionTypes.push('emq');
-  if (saq) questionTypes.push('saq');
-
-  if (questionTypes.length > 0) {
-    query = query.in('question_type', questionTypes);
-  }
-
-  const { data: allQuestions, error } = await query.limit(numberOfQuestions);
+    })
+    .in('difficulty', difficulties)
+    .in('question_type', questionTypes);
 
   if (error) {
     throw error;
@@ -176,8 +170,16 @@ export async function fetchQuestions({
     return false;
   });
 
+  // Shuffle the questions if the option is selected
+  if (shuffle) {
+    filteredQuestions.sort(() => Math.random() - 0.5);
+  }
+
+  // Apply the limit after filtering
+  const limitedQuestions = filteredQuestions.slice(0, numberOfQuestions);
+
   return {
-    questions: filteredQuestions,
+    questions: limitedQuestions,
     message: null,
   };
 }

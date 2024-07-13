@@ -1,7 +1,7 @@
 'use client';
 
-import { Space, Check } from 'lucide-react';
-import { JSX, SVGProps, SetStateAction, useState } from 'react';
+import { Space, Check, X } from 'lucide-react';
+import { JSX, SVGProps, SetStateAction, useState, Fragment } from 'react';
 import Button from '~/core/ui/Button';
 import Label from '~/core/ui/Label';
 import { RadioGroup, RadioGroupItem } from '~/core/ui/RadioGroup';
@@ -42,6 +42,7 @@ import CommentBox from './CommentBox';
 import { ScrollArea } from '~/core/ui/scroll-area';
 import PrevAttemptsBox from './PrevAttemptsBox';
 import Image from 'next/image';
+import { Skeleton } from '~/core/ui/skeleton';
 
 type EditableQuestionFields = {
   question_text: string;
@@ -50,6 +51,7 @@ type EditableQuestionFields = {
   max_marks: number;
   options?: Record<string, string>;
   image_url_question?: string | null;
+  image_url_answer?: string | null;
 };
 
 export default function ReviewScreen({
@@ -90,6 +92,7 @@ export default function ReviewScreen({
     correct_answer: '',
     explanation: '',
     max_marks: 0,
+    options: {},
   });
 
   const userId = useUserId();
@@ -116,18 +119,14 @@ export default function ReviewScreen({
   const ADMIN_EMAILS = [
     'admin@pdf2-anki.com',
     'pdf2anki@gmail.com',
-    'thetechjason@gmail.com',
     'jason@xon.so',
     'hi@xon.so',
+    'techjson@connect.hku.hk',
+    'u3607233@connect.hku.hk',
+    'jasonchan@connect.hku.hk',
+    'tccalvin@connect.hku.hk',
+    'wongzita@connect.hku.hk',
   ];
-
-  useEffect(() => {
-    if (currentQuestion?.options) {
-      const entries = Object.entries(currentQuestion.options);
-      const shuffled = entries.sort(() => Math.random() - 0.5);
-      setShuffledOptions(Object.fromEntries(shuffled));
-    }
-  }, [currentQuestion]);
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
@@ -150,7 +149,9 @@ export default function ReviewScreen({
       // Save changes
       updateQuestion(currentQuestion.id, editedQuestion)
         .then(() => {
-          toast.success('Question updated successfully');
+          toast.success(
+            'Question updated successfully. Please note that the change is not reflected in real time. However, it is changed in the backend and will be reflected for everyone. You can check by force refreshing and re-selecting the topic to see this question.',
+          );
           setIsEditing(false);
         })
         .catch((error) => {
@@ -166,6 +167,7 @@ export default function ReviewScreen({
         max_marks: currentQuestion.max_marks || 0,
         options: currentQuestion.options,
         image_url_question: currentQuestion.image_url_question,
+        image_url_answer: currentQuestion.image_url_answer,
       });
       setIsEditing(true);
     }
@@ -183,7 +185,10 @@ export default function ReviewScreen({
     console.log('currentQuestion', currentQuestion);
     let isCorrect = false;
 
-    if (currentQuestion?.question_type === 'mcq') {
+    if (
+      currentQuestion?.question_type === 'mcq' ||
+      currentQuestion?.question_type === 'emq'
+    ) {
       isCorrect = selectedAnswer.value === currentQuestion.correct_answer;
       if (userId) {
         await appendResponse(
@@ -273,6 +278,19 @@ export default function ReviewScreen({
       },
     });
   };
+
+  useEffect(() => {
+    if (currentQuestion?.options) {
+      const entries = Object.entries(currentQuestion.options);
+      const shuffled = entries.sort(() => Math.random() - 0.5);
+      setShuffledOptions(Object.fromEntries(shuffled));
+    }
+    // Reset selectedAnswer when currentQuestionIndex changes
+    setSelectedAnswer({ key: '', value: '' });
+    // Reset saqAnswer when currentQuestionIndex changes
+    setSaqAnswer('');
+  }, [currentQuestion]);
+
   useEffect(() => {
     if (isReviewCompleted) {
       const score = answeredCorrectly.size;
@@ -327,8 +345,8 @@ export default function ReviewScreen({
   }
 
   return (
-    <div className="flex flex-col items-center w-full  p-4 bg-gray-50 pt-12">
-      <div className="flex items-center justify-between w-full max-w-4xl p-4 bg-white border rounded-md shadow-sm">
+    <div className="flex flex-col items-center w-full  p-4 bg-gray-50 pt-12 dark:bg-gray-900">
+      <div className="flex items-center justify-between w-full max-w-4xl p-4 bg-white border dark:bg-gray-800 dark:border-gray-700 rounded-md shadow-sm">
         <button
           className="p-2"
           onClick={handlePreviousQuestion}
@@ -370,7 +388,7 @@ export default function ReviewScreen({
           />
         </button>
       </div>
-      <div className="flex flex-col  w-full max-w-4xl p-4 mt-4 bg-white border rounded-md shadow-sm">
+      <div className="flex flex-col  w-full max-w-4xl p-4 mt-4 bg-white border dark:bg-gray-800 dark:border-gray-700 rounded-md shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between">
           <div className="mb-4 flex flex-row space-x-2">
             <TooltipProvider>
@@ -484,7 +502,8 @@ export default function ReviewScreen({
         </div>
         <div className="">
           {isEditing ? (
-            <div className="space-y-4">
+            <div className="space-y-2">
+              <span className="text-sm text-gray-500">Question Text</span>
               <textarea
                 className="w-full p-2 border rounded"
                 value={editedQuestion.question_text}
@@ -495,6 +514,9 @@ export default function ReviewScreen({
                   })
                 }
               />
+              <span className="text-sm text-gray-500">
+                Max Marks (Set 1 for MCQ)
+              </span>
               <input
                 type="number"
                 className="w-full p-2 border rounded"
@@ -506,17 +528,59 @@ export default function ReviewScreen({
                   })
                 }
               />
-              <textarea
-                className="w-full p-2 border rounded"
-                value={editedQuestion.correct_answer}
-                onChange={(e) =>
-                  setEditedQuestion({
-                    ...editedQuestion,
-                    correct_answer: e.target.value,
-                  })
-                }
-                placeholder="Correct Answer"
-              />
+
+              <span className="text-sm text-gray-500">Options</span>
+              {Object.entries(editedQuestion.options || {}).map(
+                ([key, value], index) => (
+                  <div key={index} className="flex items-center space-x-2 mb-2">
+                    <input
+                      type="text"
+                      className="w-1/4 p-2 border rounded"
+                      value={key}
+                      onChange={(e) => {
+                        const newOptions = { ...editedQuestion.options };
+                        const oldValue = newOptions[key];
+                        delete newOptions[key];
+                        newOptions[e.target.value] = oldValue;
+                        setEditedQuestion({
+                          ...editedQuestion,
+                          options: newOptions,
+                        });
+                      }}
+                      placeholder="Option Key"
+                    />
+                    <input
+                      type="text"
+                      className="w-3/4 p-2 border rounded"
+                      value={value}
+                      onChange={(e) => {
+                        const newOptions = { ...editedQuestion.options };
+                        newOptions[key] = e.target.value;
+                        setEditedQuestion({
+                          ...editedQuestion,
+                          options: newOptions,
+                        });
+                      }}
+                      placeholder="Option Value"
+                    />
+                  </div>
+                ),
+              )}
+              <div className="mt-2">
+                <span className="text-sm text-gray-500">Correct Answer</span>
+                <textarea
+                  className="w-full p-2 border rounded"
+                  value={editedQuestion.correct_answer}
+                  onChange={(e) =>
+                    setEditedQuestion({
+                      ...editedQuestion,
+                      correct_answer: e.target.value,
+                    })
+                  }
+                  placeholder="Correct Answer"
+                />
+              </div>
+              <span className="text-sm text-gray-500">Explanation</span>
               <textarea
                 className="w-full p-2 border rounded"
                 value={editedQuestion.explanation}
@@ -529,37 +593,79 @@ export default function ReviewScreen({
                 placeholder="Explanation"
               />
 
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    uploadImage(
-                      e.target.files[0],
-                      currentQuestion.id,
-                      'question',
-                      csrfToken,
-                    )
-                      .then((url) => {
-                        toast.success('Image uploaded successfully');
-                        setEditedQuestion({
-                          ...editedQuestion,
-                          image_url_question: url,
+              <div className="flex flex-col space-y-2">
+                <span className="text-sm text-gray-500">
+                  Image (For Question)
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      uploadImage(
+                        e.target.files[0],
+                        currentQuestion.id,
+                        'question',
+                        csrfToken,
+                      )
+                        .then((url) => {
+                          toast.success(
+                            'Image uploaded successfully. Please note that the change is not reflected in real time. However, it is changed in the backend and will be reflected for everyone. You can check by force refreshing and re-selecting the topic to see this question.',
+                          );
+                          setEditedQuestion({
+                            ...editedQuestion,
+                            image_url_question: url,
+                          });
+                        })
+                        .catch((error) => {
+                          console.error('Failed to upload image:', error);
+                          toast.error(
+                            'Failed to upload image. Please try again.',
+                          );
                         });
-                      })
-                      .catch((error) => {
-                        console.error('Failed to upload image:', error);
-                        toast.error(
-                          'Failed to upload image. Please try again.',
-                        );
-                      });
-                  }
-                }}
-              />
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex flex-col space-y-2">
+                <span className="text-sm text-gray-500">
+                  Image (For Answer)
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      uploadImage(
+                        e.target.files[0],
+                        currentQuestion.id,
+                        'answer',
+                        csrfToken,
+                      )
+                        .then((url) => {
+                          toast.success(
+                            'Image uploaded successfully. Please note that the change is not reflected in real time. However, it is changed in the backend and will be reflected for everyone. You can check by force refreshing and re-selecting the topic to see this question.',
+                          );
+                          setEditedQuestion({
+                            ...editedQuestion,
+                            image_url_answer: url,
+                          });
+                        })
+                        .catch((error) => {
+                          console.error('Failed to upload image:', error);
+                          toast.error(
+                            'Failed to upload image. Please try again.',
+                          );
+                        });
+                    }
+                  }}
+                />
+              </div>
             </div>
           ) : (
             <>
-              <h2 className="my-2 text-lg font-semibold">
+              <h2 className="my-2 text-lg font-semibold whitespace-pre-wrap">
                 {currentQuestion?.question_text}
               </h2>
               <QuestionImage imageUrl={currentQuestion?.image_url_question} />
@@ -570,8 +676,8 @@ export default function ReviewScreen({
           )}
 
           {userEmail && ADMIN_EMAILS.includes(userEmail) && (
-            <Button onClick={toggleEditMode}>
-              {isEditing ? 'Save Changes' : 'Edit Question'}
+            <Button onClick={toggleEditMode} className="my-4 text-xs">
+              {isEditing ? 'Save Changes' : 'Edit Question (Admin Only)'}
             </Button>
           )}
 
@@ -589,9 +695,9 @@ export default function ReviewScreen({
                 const bgColor =
                   showAnswer || completedQuestions.has(currentQuestion.id)
                     ? correctAnswer
-                      ? 'bg-green-100'
-                      : 'bg-red-100'
-                    : 'bg-white';
+                      ? 'bg-green-100 dark:bg-green-800'
+                      : 'bg-red-100 dark:bg-red-800'
+                    : 'bg-white dark:bg-gray-600';
 
                 return (
                   <div
@@ -605,7 +711,7 @@ export default function ReviewScreen({
                         showAnswer || completedQuestions.has(currentQuestion.id)
                       }
                     />
-                    <Label htmlFor={key} className="ml-2">
+                    <Label htmlFor={key} className="ml-2 dark:text-white">
                       {value as React.ReactNode}
                     </Label>
                     {/* <Badge className="ml-auto">{key}</Badge> */}
@@ -617,42 +723,46 @@ export default function ReviewScreen({
 
           {/* MCQ OPTION BOX FOR EMQ ONLY */}
           {currentQuestion?.question_type === 'emq' && (
-            <RadioGroup
-              value={selectedAnswer.key}
-              onValueChange={(key) =>
-                setSelectedAnswer({ key, value: shuffledOptions[key] })
-              }
-            >
-              {Object.entries(shuffledOptions).map(([key, value]) => {
-                const correctAnswer = value === currentQuestion.correct_answer;
-                // const isSelected = selectedAnswer === value;
-                const bgColor =
-                  showAnswer || completedQuestions.has(currentQuestion.id)
-                    ? correctAnswer
-                      ? 'bg-green-100'
-                      : 'bg-red-100'
-                    : 'bg-white';
+            <div className=" mb-28">
+              <RadioGroup
+                value={selectedAnswer.key}
+                onValueChange={(key) =>
+                  setSelectedAnswer({ key, value: shuffledOptions[key] })
+                }
+              >
+                {Object.entries(shuffledOptions).map(([key, value]) => {
+                  const correctAnswer =
+                    value === currentQuestion.correct_answer;
+                  // const isSelected = selectedAnswer === value;
+                  const bgColor =
+                    showAnswer || completedQuestions.has(currentQuestion.id)
+                      ? correctAnswer
+                        ? 'bg-green-100 dark:bg-green-800'
+                        : 'bg-red-100 dark:bg-red-800'
+                      : 'bg-white dark:bg-gray-600';
 
-                return (
-                  <div
-                    key={key}
-                    className={`flex items-center p-4 mb-2 border rounded-md ${bgColor}`}
-                  >
-                    <RadioGroupItem
-                      value={key}
-                      id={key}
-                      disabled={
-                        showAnswer || completedQuestions.has(currentQuestion.id)
-                      }
-                    />
-                    <Label htmlFor={key} className="ml-2">
-                      {value as React.ReactNode}
-                    </Label>
-                    {/* <Badge className="ml-auto">{key}</Badge> */}
-                  </div>
-                );
-              })}
-            </RadioGroup>
+                  return (
+                    <div
+                      key={key}
+                      className={`flex items-center p-4 mb-2 border rounded-md ${bgColor}`}
+                    >
+                      <RadioGroupItem
+                        value={key}
+                        id={key}
+                        disabled={
+                          showAnswer ||
+                          completedQuestions.has(currentQuestion.id)
+                        }
+                      />
+                      <Label htmlFor={key} className="ml-2 dark:text-white">
+                        {value as React.ReactNode}
+                      </Label>
+                      {/* <Badge className="ml-auto">{key}</Badge> */}
+                    </div>
+                  );
+                })}
+              </RadioGroup>
+            </div>
           )}
 
           {/* SAQ TEXT AREA BOX FOR SAQ ONLY */}
@@ -663,6 +773,7 @@ export default function ReviewScreen({
               disabled={
                 showAnswer || completedQuestions.has(currentQuestion.id)
               }
+              style={{ minHeight: '200px' }}
             />
           )}
 
@@ -687,10 +798,17 @@ export default function ReviewScreen({
                         : 'bg-red-100'
                   }`}
                 >
-                  <span className="font-semibold text-lg">
-                    Your Mark: {generatedFeedback.student_mark}/
-                    {currentQuestion.max_marks}
-                  </span>
+                  {isLoading ? (
+                    <span className="text-gray-500 font-semibold text-lg  animate-pulse">
+                      Looking, judging and marking your answer...
+                      <span className="animate-ellipsis">...</span>
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-lg">
+                      Your Mark: {generatedFeedback.student_mark}/
+                      {currentQuestion.max_marks}
+                    </span>
+                  )}
                 </div>
                 <div className="p-2">
                   <Badge variant="outline">Mark Distribution:</Badge>
@@ -713,7 +831,7 @@ export default function ReviewScreen({
 
                 <div className="p-2">
                   <Badge className="bg-red-500">
-                    <Check className="w-4 h-4 mr-2" />
+                    <X className="w-4 h-4 mr-2" />
                     What you did not well
                   </Badge>
 
@@ -728,18 +846,59 @@ export default function ReviewScreen({
 
           {(showAnswer || completedQuestions.has(currentQuestion.id)) && (
             <div className="mt-4 flex flex-col space-y-4 mb-32">
-              <div className="p-4 bg-gray-100 rounded-md">
+              <div className="p-4 bg-gray-100 rounded-md dark:bg-gray-700">
                 <p className="font-semibold">
-                  Correct Answer: {currentQuestion.correct_answer}
-                </p>
-                <QuestionImage imageUrl={currentQuestion?.image_url_answer} />
-                <p className="mt-2">
-                  Explanation:
+                  Correct Answer:
                   <br />
-                  {currentQuestion.explanation}
+                  <br />
+                  {currentQuestion.correct_answer
+                    ?.split(/(\([b-z]\))/)
+                    .map((part, index) => (
+                      <Fragment key={index}>
+                        {index > 0 && part.match(/^\([b-z]\)/) ? (
+                          <>
+                            <br />
+                            <br />
+                          </>
+                        ) : null}
+                        {part}
+                      </Fragment>
+                    ))}
                 </p>
+
+                <QuestionImage imageUrl={currentQuestion?.image_url_answer} />
+                <div className="mt-4 border-t border-gray-200 pt-4">
+                  {currentQuestion.explanation && (
+                    <>
+                      <p className="font-semibold">Explanation:</p>
+                      <p className="mt-2">
+                        {/* {currentQuestion.explanation} */}
+                        {currentQuestion.explanation
+                          ?.split(/(\([a-z]\))/)
+                          .map((part, index) => (
+                            <Fragment key={index}>
+                              {index > 0 && part.match(/^\([a-z]\)/) ? (
+                                <>
+                                  <br />
+                                  <br />
+                                </>
+                              ) : null}
+                              {part}
+                            </Fragment>
+                          ))}
+                      </p>
+                    </>
+                  )}
+                </div>
               </div>
-              <PrevAttemptsBox questionID={currentQuestion.id} />
+              <PrevAttemptsBox
+                questionID={currentQuestion.id}
+                questionType={currentQuestion.question_type}
+                maxMarks={
+                  currentQuestion.max_marks ??
+                  (currentQuestion.question_type === 'saq' ? 5 : 1)
+                }
+              />
               <CommentBox questionID={currentQuestion.id} />
             </div>
           )}
@@ -747,6 +906,13 @@ export default function ReviewScreen({
       </div>
 
       <div className="fixed bottom-0 right-0 flex items-center space-x-2 p-4 bg-white dark:bg-slate-950 border-t border-zinc-200 z-50 lg:left-[17rem] left-0">
+        <Button
+          onClick={onReviewCompleted}
+          className="mr-auto"
+          variant="destructive"
+        >
+          Exit Review
+        </Button>
         {showAnswer || completedQuestions.has(currentQuestion.id) ? (
           <Button className="ml-auto mr-2" onClick={handleNextQuestion}>
             {currentQuestionIndex === questions.length - 1 ? (
@@ -761,7 +927,7 @@ export default function ReviewScreen({
           </Button>
         ) : (
           <Button className="ml-auto mr-2" onClick={handleCheckAnswer}>
-            Check Answer <Space className="w-4 h-4 ml-2" />
+            Check Answer
           </Button>
         )}
       </div>

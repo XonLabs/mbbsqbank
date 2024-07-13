@@ -16,7 +16,10 @@ import TopicTable from '../components/TopicTable';
 export default async function Component() {
   const appData = await loadAppData();
 
-  if (!appData.auth.user.email?.endsWith('@connect.hku.hk')) {
+  if (
+    !appData.auth.user.email?.endsWith('@connect.hku.hk') &&
+    appData.auth.user.email !== 'thetechjason@gmail.com'
+  ) {
     return (
       <>
         <div className="text-center text-2xl font-bold mt-10">

@@ -17,6 +17,7 @@ import { Skeleton } from '~/core/ui/skeleton';
 interface Attempt {
   id: string;
   selected_option: string;
+  answer_text: string;
   is_correct: boolean;
   marks_scored: number;
   created_at: string;
@@ -24,8 +25,12 @@ interface Attempt {
 
 export default function PrevAttemptsBox({
   questionID,
+  questionType,
+  maxMarks,
 }: {
   questionID: string;
+  questionType: string;
+  maxMarks: number;
 }) {
   const userId = useUserId();
   const csrfToken = useCsrfToken();
@@ -77,10 +82,10 @@ export default function PrevAttemptsBox({
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-base font-bold">
-          Previous MCQ Attempts
+          Previous {questionType.toUpperCase()} Attempts
         </CardTitle>
         <CardDescription className="text-xs">
-          Review your past performance on this MCQ.
+          Review your past performance on this {questionType.toUpperCase()}.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -118,7 +123,14 @@ export default function PrevAttemptsBox({
                             <XIcon className="h-3 w-3" />
                           )}
                         </div>
-                        <span>Selected: {attempt.selected_option}</span>
+                        {questionType === 'saq' && (
+                          <span className="text-xs font-medium">
+                            {attempt.answer_text}
+                          </span>
+                        )}
+                        {questionType === 'mcq' && (
+                          <span>Selected: {attempt.selected_option}</span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-500">
                         {format(
@@ -132,7 +144,7 @@ export default function PrevAttemptsBox({
                         attempt.is_correct ? 'text-green-500' : 'text-red-500'
                       }`}
                     >
-                      {attempt.marks_scored}/1
+                      {attempt.marks_scored}/{maxMarks}
                     </div>
                   </div>
                 ))}
